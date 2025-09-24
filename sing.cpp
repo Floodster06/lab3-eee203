@@ -52,7 +52,8 @@ void introScreen() {
     display.gotoXY(1, 7);
     display.print("To start, press B");
 
-    if (buttonB.isPressed()) { // if button B is pressed set start to true
+    if (buttonB.isPressed()) {
+        // if button B is pressed set start to true
         start = true;
     }
 }
@@ -74,7 +75,8 @@ void loop() {
 
         // double the determined frequency and play it for 30ms
         buzzer.playFrequency(playedFreq * 2, 30, 11);
-    } else { // until start is true, keep displaying introScreen()
+    } else {
+        // until start is true, keep displaying introScreen()
         introScreen();
     }
 }
