@@ -1,25 +1,26 @@
 /*
- *Description: Make the robot perform the actions required of it as detailed in
- *lab 3 section 1
- *Author: OCdt Flood, OCdt Lee
- *Version: 17-09-2025
+ * A program that where each time the user presses button B, a single raw
+ * reading from the centre reflectance sensor is displayed on screen.
+ *
+ * Author: OCdt Flood, OCdt Lee
+ * Version: 2025-09-24
  */
 
 #include <Pololu3piPlus32U4Buttons.h>
 #include <Pololu3piPlus32U4.h>
 
 using namespace Pololu3piPlus32U4;
+
 ButtonB buttonB;
 OLED display;
 LineSensors lineSensors;
 
+bool start = false; // flag to determine whether program is started or not
+
 /*
- *Print intro screen and wait until button B is pressed. Once pressed, take a
- *reading using the line sensors, then print the middle sensors' reading on the
- *screen.
+ * Displays the required start up screen to the display of the bot.
  */
-void see() {
-    uint16_t sensorReadings[5];
+void introScreen() {
     display.gotoXY(3, 0);
     display.print("Michael Flood");
     display.gotoXY(5, 1);
@@ -28,9 +29,33 @@ void see() {
     display.print("Lab 3-1: See");
     display.gotoXY(1, 7);
     display.print("To start, press B");
+
     if (buttonB.isPressed()) {
-        lineSensors.read(sensorReadings);
+        // if button B is pressed set start to true
+        start = true;
+    }
+}
+
+void setup() {
+    display.init();
+    display.setLayout21x8();
+}
+
+void loop() {
+    if (start == true) {
         display.clear();
-        display.print(sensorReadings[2]);
+
+        uint16_t eee[5]; // establishes array of reflectance values
+
+        // reads sensors and populates array of reflectance values
+        lineSensors.read(eee);
+
+        display.clear();
+        display.gotoXY(7, 3); // centers display
+        display.print(eee[2]); // prints the middle sensor value to screen
+    } else {
+        // until start is true, keep displaying introScreen()
+
+        introScreen();
     }
 }
