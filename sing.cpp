@@ -7,7 +7,6 @@ using namespace Pololu3piPlus32U4;
 OLED display;
 ButtonB buttonB;
 LineSensors lineSensors;
-PololuBuzzer buzzer;
 
 
 bool start = false;
@@ -59,7 +58,7 @@ void loop() {
 
         int playedFreq = 3500 - see();
 
-        buzzer.playFrequency(playedFreq * 2, 30, 11);
+        Buzzer::playFrequency(playedFreq * 2, 30, 11);
 
     } else {
 
