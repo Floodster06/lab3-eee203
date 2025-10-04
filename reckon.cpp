@@ -1,50 +1,17 @@
 //
 // Created by s31197 on 2025-10-03.
 //
-float reckonCalibration(uint16_t sensorReadings[5]) {
-    display.clear();
-    display.gotoXY(3, 3);
-    display.print("Ready to measure");
-    display.gotoXY(7, 3);
-    display.print("Press B");
 
-    //initial calibration
-    if (buttonB.isPressed()) {
-        //flavour text
-        display.clear();
-        display.gotoXY(5, 3);
-        display.print("Calibrating");
+/*
+//    README:
+//ok so pretty much the problem here is that this doesn't work
+//it goes into a loop of not doing anything due to line 19. That line just stops the program in its tracks.
+//however when removed it skips calibration and goes to the while loop in line 56. This is not what I want
+//What I want is for the program to wait until buttonB was pressed, do the calibration stuff on line 21, then go to the while loop
+//the while loop has its own problems. for some reason i can't get the switch case to work properly and its going to the default case when i press buttonA or buttonC too many times, then fixes itself with an extra button press .
+//oh also the while loop on line 56 has it constantly clearing and printing the same stuff making the screen have this weird effect, so I want to be able to have it print one thing, then stop until it detects ANY button press, then do stuff.
+//otherwise it should work perfectly in theory.
 
-
-        //0 = hasn't started calibration, approaching calibration start
-        //1 = started calibration, still calibrating
-        //2 = finished calibration
-        int calCheck = 0;
-
-        while (calCheck != 2) {
-            follow(sensorReadings);
-            //started calibration, reset counts
-            if (sensorReadings[0] == 1000 && sensorReadings[4] == 1000 && !
-                calCheck) {
-                Encoders::getCountsAndResetLeft();
-                Encoders::getCountsAndResetRight();
-                ++calCheck;
-                //finished calibration, break from loop
-            } else if (sensorReadings[0] == 1000 && sensorReadings[4] == 1000 &&
-                       calCheck == 1) {
-                ++calCheck;
-            }
-        }
-        //stop, save counts
-        Motors::setSpeeds(0, 0);
-        int leftCounts = Encoders::getCountsAndResetLeft();
-        int rightCounts = Encoders::getCountsAndResetRight();
-
-        float oneCM = ((float) (leftCounts + rightCounts) / 2) / 120;
-        return oneCM;
-    }
-    return 0;
-}
 
 void reckon(uint16_t sensorReadings[5]) {
     display.clear();
@@ -52,7 +19,7 @@ void reckon(uint16_t sensorReadings[5]) {
     display.print("Ready to measure");
     display.gotoXY(7, 4);
     display.print("Press B");
-    buttonB.waitForButton();
+    buttonB.waitForPress();
     //initial calibration
     if (buttonB.isPressed()) {
         //flavour text
@@ -81,6 +48,7 @@ void reckon(uint16_t sensorReadings[5]) {
                     ++calCheck;
                            }
         }
+    }
         //stop, save counts
         Motors::setSpeeds(0, 0);
         int leftCounts = Encoders::getCountsAndResetLeft();
