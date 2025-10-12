@@ -1,147 +1,183 @@
-//
-// Created by s31197 on 2025-10-03.
-//
+/*
+ *Drive the robot forward a user-selected distance, using information gathered
+ *in a distance calibration step to determine when to stop.
+ *
+ *Authors: OCdt Lee, OCdt Flood
+ *Version: 12-10-2025
+ */
+
+#include <Pololu3piPlus32U4Buttons.h>
+#include <Pololu3piPlus32U4.h>
+
+using namespace Pololu3piPlus32U4;
+ButtonA buttonA;
+ButtonB buttonB;
+ButtonC buttonC;
+OLED display;
+LineSensors lineSensors;
 
 /*
-//    README:
-//ok so pretty much the problem here is that this doesn't work
-//it goes into a loop of not doing anything due to line 19. That line just stops the program in its tracks.
-//however when removed it skips calibration and goes to the while loop in line 56. This is not what I want
-//What I want is for the program to wait until buttonB was pressed, do the calibration stuff on line 21, then go to the while loop
-//the while loop has its own problems. for some reason i can't get the switch case to work properly and its going to the default case when i press buttonA or buttonC too many times, then fixes itself with an extra button press .
-//oh also the while loop on line 56 has it constantly clearing and printing the same stuff making the screen have this weird effect, so I want to be able to have it print one thing, then stop until it detects ANY button press, then do stuff.
-//otherwise it should work perfectly in theory.
+ *Pause all further code, until any initalized button has been pressed. Once
+ *pressed, return an int corresponding to the button pressed. 1 = button A,
+ *2 = button B, 3 = button C, and so on.
+ *
+ *returns: int from 1-3 corresponding to button pressed
+ */
+int waitAnyPress() {
+    int pressed = 0;
+    do {
+        if (buttonA.getSingleDebouncedRelease()) {
+            pressed = 1;
+        } else if (buttonB.getSingleDebouncedRelease()) {
+            pressed = 2;
+        } else if (buttonC.getSingleDebouncedRelease()) {
+            pressed = 3;
+        }
+        delay(10);
+    } while (pressed == 0);
+    return pressed;
+}
 
-
+/*
+ *Drives forward a user-selected distance, using information gathered in a
+ *distance calibration step to determine when to stop
+ */
 void reckon(uint16_t sensorReadings[5]) {
+    //Initial display setup
     display.clear();
     display.gotoXY(3, 3);
     display.print("Ready to measure");
     display.gotoXY(7, 4);
     display.print("Press B");
+
     buttonB.waitForPress();
-    //initial calibration
+
+    //Initial distance calibration step
     if (buttonB.isPressed()) {
         //flavour text
         display.clear();
         display.gotoXY(5, 3);
         display.print("Calibrating");
-        display.print("\0");
-
 
         //0 = hasn't started calibration, approaching calibration start
         //1 = started calibration, still calibrating
         //2 = finished calibration
         int calCheck = 0;
-
         while (calCheck != 2) {
             follow(sensorReadings);
-            //started calibration, reset counts
-            if (sensorReadings[0] == 1000 && sensorReadings[4] == 1000 && !
-                calCheck) {
+            //started calibration, reset encoder values for accuracy
+            if (sensorReadings[0] == 1000 && sensorReadings[4] == 1000 &&
+                calCheck != 1) {
                 Encoders::getCountsAndResetLeft();
                 Encoders::getCountsAndResetRight();
-                ++calCheck;
-                //finished calibration, break from loop
-                } else if (sensorReadings[0] == 1000 && sensorReadings[4] == 1000 &&
-                           calCheck == 1) {
-                    ++calCheck;
-                           }
+                calCheck = 1;
+                //Delay so that robot passes the first black lines and doesn't
+                //get stuck. Value is arbitrary and thus doesn't need
+                //declaration as a constant
+                delay(500);
+                //Finished calibration, break from loop
+            } else if (sensorReadings[0] == 1000 && sensorReadings[4] == 1000 &&
+                       calCheck == 1) {
+                calCheck = 2;
+            }
         }
     }
-        //stop, save counts
-        Motors::setSpeeds(0, 0);
-        int leftCounts = Encoders::getCountsAndResetLeft();
-        int rightCounts = Encoders::getCountsAndResetRight();
+    //Stop movement, save encoder counts
+    Motors::setSpeeds(0, 0);
+    int leftCounts = Encoders::getCountsAndResetLeft();
+    int rightCounts = Encoders::getCountsAndResetRight();
+    //get the encoder value equivalent of 1 centimeter
+    int oneCM = ((leftCounts + rightCounts) / 2) / 30;
 
-        float oneCM = ((float) (leftCounts + rightCounts) / 2) / 120;
-
-
-        while (true){
-            //set move distance portion of code
-            int count = 0;
-            while (!buttonB.isPressed()) {
-                //common display settings for all distances
-                display.clear();
-                display.gotoXY(8, 0);
-                display.print("Ready");
-                display.gotoXY(9, 7);
-                display.print("Go");
-                display.print("\0");
-
-                //reset count to correct value if value flows outside of intended
-                //range
-                if (count == 5) {
-                    count = 0;
-                } else if (count == -1) {
-                    count = 4;
-                }
-
-                //show different distances depending on count value
-                switch (count) {
-                    case 0:
-                        display.gotoXY(9, 3);
-                        display.print("10");
-                        break;
-                    case 1:
-                        display.gotoXY(9, 3);
-                        display.print("30");
-                        break;
-                    case 2:
-                        display.gotoXY(9, 3);
-                        display.print("60");
-                        break;
-                    case 3:
-                        display.gotoXY(9, 3);
-                        display.print("100");
-                    case 4:
-                        display.gotoXY(9, 3);
-                        display.print("200");
-                    default:
-                        display.print("Something went wrong.");
-                }
-                //in/decrement count based on if A or B is pressed
-                if (buttonC.getSingleDebouncedRelease()) {
-                    ++count;
-                } else if (buttonA.getSingleDebouncedRelease()) {
-                    --count;
-                }
-            }
-            //might need to be a different button b check
-
-            //Actually move now
+    //Distance screen & movement part of code. While true is necessary as per
+    //lab instructions.
+    while (true) {
+        //Setting the move distance portion of code
+        //count is used as an index to represent which distance is selected.
+        int count = 0;
+        int distances[] = {10, 30, 60, 100, 200};
+        //press represents which button has been pressed. See waitAnyPress
+        //function for more details
+        int press = 0;
+        //Changing distances displayed on the screen while buttonB hasn't been
+        //pressed.
+        while (press != 2) {
+            //common display settings for all distances
             display.clear();
-            display.gotoXY(7, 3);
-            display.print("Driving");
-            switch (count) {
-                case 0:
-                    while (Encoders::getCountsLeft() != (oneCM * 10)) {
-                        Motors::setSpeeds(50, 50);
-                    }
-                    break;
-                case 1:
-                    while (Encoders::getCountsLeft() != (oneCM * 30)) {
-                        Motors::setSpeeds(50, 50);
-                    }
-                    break;
-                case 2:
-                    while (Encoders::getCountsLeft() != (oneCM * 60)) {
-                        Motors::setSpeeds(50, 50);
-                    }
-                    break;
-                case 3:
-                    while (Encoders::getCountsLeft() != (oneCM * 100)) {
-                        Motors::setSpeeds(50, 50);
-                    }
-                    break;
-                case 4:
-                    while (Encoders::getCountsLeft() != (oneCM * 200)) {
-                        Motors::setSpeeds(50, 50);
-                    }
-                    break;
+            display.gotoXY(8, 0);
+            display.print("Ready");
+            display.gotoXY(9, 7);
+            display.print("Go");
+            display.print("\0");
+
+            //reset count to correct value if value flows outside of
+            //intended range
+            if (count > 4) {
+                count = 0;
+            } else if (count < 0) {
+                count = 4;
             }
-            //Done
-            Motors::setSpeeds(0, 0);
+
+            //show different distances depending on count value
+            display.gotoXY(9, 3);
+            display.print(distances[count]);
+
+            press = waitAnyPress();
+            //in or decrement count based on if A or B is pressed
+            if (press == 3) {
+                ++count;
+            } else if (press == 1) {
+                --count;
+            }
         }
+
+        //Actually move now
+        //Flavour text
+        display.clear();
+        display.gotoXY(7, 3);
+        display.print("Driving");
+        display.gotoXY(9, 7);
+        display.print(oneCM);
+        //Reset encoders
+        Encoders::getCountsAndResetLeft();
+        Encoders::getCountsAndResetRight();
+        //int representing how far robot has moved
+        int moveDistance = 0;
+        //I LOVE SWITCH STATEMENTS RAHHHHHHHHH
+        //each case represents a different distance, no base case needed.
+        switch (count) {
+            case 0:
+                while (moveDistance != oneCM * distances[count]) {
+                    moveDistance = Encoders::getCountsLeft();
+                    Motors::setSpeeds(50, 50);
+                }
+                break;
+            case 1:
+                while (moveDistance != oneCM * distances[count]) {
+                    moveDistance = Encoders::getCountsLeft();
+                    Motors::setSpeeds(50, 50);
+                }
+                break;
+            case 2:
+                while (moveDistance != oneCM * distances[count]) {
+                    moveDistance = Encoders::getCountsLeft();
+                    Motors::setSpeeds(50, 50);
+                }
+                break;
+            case 3:
+                while (moveDistance != oneCM * distances[count]) {
+                    moveDistance = Encoders::getCountsLeft();
+                    Motors::setSpeeds(50, 50);
+                }
+                break;
+            case 4:
+                while (moveDistance != oneCM * distances[count]) {
+                    moveDistance = Encoders::getCountsLeft();
+                    Motors::setSpeeds(50, 50);
+                }
+                break;
+        }
+        //Done moving
+        Motors::setSpeeds(0, 0);
     }
 }
